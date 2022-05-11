@@ -1,11 +1,12 @@
 use std::{env, fs, path::PathBuf, process::Command};
 
 pub fn main() {
-    build::rerun_if_changed("build.rs");
-
     let manifest_dir = build::cargo_manifest_dir();
     let impl_dir = manifest_dir.join("impl");
     let impl_wasm = manifest_dir.join("src/impl.wasm");
+
+    build::rerun_if_changed("build.rs");
+    build::rerun_if_changed(&impl_dir);
 
     // if packaged
     if !impl_dir.exists() {
@@ -20,10 +21,7 @@ pub fn main() {
     }
 
     // rebuild wasm module
-    build::rerun_if_changed(&impl_dir);
-
     let cargo = build::cargo();
-    let out_dir = build::out_dir();
     let impl_manifest = impl_dir.join("Cargo.toml");
 
     let cargo_home = None
@@ -58,11 +56,32 @@ pub fn main() {
         // we tried ¯\_(ツ)_/¯
         .unwrap_or_else(|| PathBuf::from("$RUSTUP_HOME"));
 
+    let target_dir = {
+        #[rustfmt::skip]
+        let output = Command::new(&cargo)
+            .arg("metadata")
+            .arg("--manifest-path").arg(&impl_manifest)
+            .arg("--no-deps")
+            .args(["--format-version", "1"])
+            .output();
+        let metadata = match output {
+            Err(fail) => panic!("Running `cargo metadata` failed: {fail}"),
+            Ok(output) if output.status.success() => {
+                json::parse(&String::from_utf8_lossy(&output.stdout)).unwrap()
+            }
+            Ok(output) => panic!(
+                "Running `cargo metadata` failed: {status}",
+                status = output.status
+            ),
+        };
+        PathBuf::from(metadata["target_directory"].as_str().unwrap())
+    };
+
     #[rustfmt::skip]
-    let status = Command::new(cargo)
+    let status = Command::new(&cargo)
         .arg("build")
         .arg("--manifest-path").arg(&impl_manifest)
-        .arg("--target-dir").arg(&out_dir)
+        .arg("--target-dir").arg(&target_dir)
         .args(["--target", "wasm32-unknown-unknown"])
         .arg("--release")
         .arg("--locked")
@@ -74,7 +93,7 @@ pub fn main() {
                 --remap-path-prefix={rustup_home}=[rustup.home]\
             ",
             manifest_dir=manifest_dir.display(),
-            target_dir=out_dir.display(),
+            target_dir=target_dir.display(),
             cargo_home=cargo_home.display(),
             rustup_home=rustup_home.display(),
         ))
@@ -89,7 +108,7 @@ pub fn main() {
 
     // copy wasm into place
     let did_copy = fs::copy(
-        out_dir.join("wasm32-unknown-unknown/release/semicoroutines_impl.wasm"),
+        target_dir.join("wasm32-unknown-unknown/release/semicoroutines_impl.wasm"),
         impl_wasm,
     );
 
