@@ -1,0 +1,19 @@
+[workspace]
+# This needs to be its own workspace in order to apply patches
+
+[package]
+name = "semicoroutines-impl"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+proc-macro2 = "1.0.38"
+quote = "1.0.18"
+syn = { version = "1.0.93", features = ["extra-traits", "full"] }
+
+[patch.crates-io]
+proc-macro2 = { git = "https://github.com/dtolnay/watt" }

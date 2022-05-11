@@ -1,0 +1,20 @@
+[package]
+name = "semicoroutines"
+version = "0.1.0"
+edition = "2021"
+
+include = [
+    "/src/lib.rs",
+    "/src/impl.wasm",
+    "/build.rs",
+    "/Cargo.toml",
+]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+watt = "0.4.0"
+
+[build-dependencies]
+build-rs = "0.1.2"
